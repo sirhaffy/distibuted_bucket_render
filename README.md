@@ -1,3 +1,5 @@
+Detta är ett experiment för att se om det går att efterlikna Team Render i Blender med Azures kraft. Den skall utvecklas med K8s senare.
+
 ## To Do
 Prompt..
 Den funkade första gången, men om jag kör ett par "Preview" och "Assemble" så funkar den inte, den ska ersätta "Render Layers" om det finns en.
@@ -14,7 +16,7 @@ Strukturera upp panelen (UI) så det är mer logiskt.
 Den skall skicka tillbaks results till render-view medans den renderar, typ varje 25%. För snabb feedback. Det är det som är hela grejen.
   
 
-# USP  
+## USP  
 - Bucket rendering, skicka tillbaks live feedback när en bucket är klar i render-view. Som Team Render gör.
 - Snabb feedback på sina ändringar, se direkt i render-view. Kommer spara kreativiteten. Kanske göra render-region, men behålla det andra synligt.
 - High resolution rendering, test-rendera i ex HD lokalt med rendera i 16K hos Azure.
