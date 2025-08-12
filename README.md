@@ -1,23 +1,18 @@
-Detta är ett experiment för att se om det går att efterlikna Team Render i Blender med Azures kraft. Den skall utvecklas med K8s senare.
-
-## To Do
-Prompt..
-Den funkade första gången, men om jag kör ett par "Preview" och "Assemble" så funkar den inte, den ska ersätta "Render Layers" om det finns en.
-Kanske tom en input ruta där man kan fritexta vilken nod den skall använda, och en checkbox som för att aktivera. Typ "Overwrite Render Layer Name of Node:"
-
-
-Kolla varför det står:
-"Rendering preview assembly..."
-"Rendering EXR assembly..."
-Den renderar inte va?
-
-Strukturera upp panelen (UI) så det är mer logiskt.
-
-Den skall skicka tillbaks results till render-view medans den renderar, typ varje 25%. För snabb feedback. Det är det som är hela grejen.
-  
+This is an experiment or MVP to see if it’s possible to replicate Team Render in Blender using the power of Azure. The aim is to later develop this to work with Kubernetes.
 
 ## USP  
-- Bucket rendering, skicka tillbaks live feedback när en bucket är klar i render-view. Som Team Render gör.
-- Snabb feedback på sina ändringar, se direkt i render-view. Kommer spara kreativiteten. Kanske göra render-region, men behålla det andra synligt.
-- High resolution rendering, test-rendera i ex HD lokalt med rendera i 16K hos Azure.
-- Skicka iväg på rendering och jobba vidare med andra saker.
+- Bucket rendering – send live feedback to the render view as each bucket is completed, just like Team Render does.
+- Fast feedback on changes – see results instantly in the render view. This will help maintain creativity. Possibly add render region, but keep the rest of the frame visible.
+- High-resolution rendering – test render in HD locally, but render in 16K on Azure.
+- Send off a render job and continue working on other tasks in the meantime.
+
+  
+## To Do
+- Check why it says:
+  - "Rendering preview assembly..."
+  - "Rendering EXR assembly..."
+  - It’s not actually rendering, is it?
+
+- Reorganize the panel (UI) so it’s more logical.
+
+- It should send results back to the render view while rendering, for example every 25%, to give quick feedback. That’s the whole point.
