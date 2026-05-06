@@ -255,8 +255,8 @@ class RenderJobManager:
         # Set environment to disable any GUI attempts
         env = os.environ.copy()
         env['DISPLAY'] = ''
-        env['BLENDER_SYSTEM_SCRIPTS'] = '/opt/blender/4.0/scripts'
-        env['BLENDER_SYSTEM_DATAFILES'] = '/opt/blender/4.0/datafiles'
+        env['BLENDER_SYSTEM_SCRIPTS'] = '/opt/blender/4.2/scripts'
+        env['BLENDER_SYSTEM_DATAFILES'] = '/opt/blender/4.2/datafiles'
 
         # Execute Blender
         job_info['blender_process'] = subprocess.Popen(
@@ -435,76 +435,6 @@ class RenderJobManager:
                 ""
             ])
 
-        # Set up compositor File Output for individual pass EXR files BEFORE rendering
-        pass_dir = str(output_path.parent / "passes")
-        script_lines.extend([
-            "",
-            "# Set up compositor to save individual passes as separate EXR files",
-            f"pass_dir = r'{pass_dir}'",
-            "import os",
-            "os.makedirs(pass_dir, exist_ok=True)",
-            "",
-            "scene.use_nodes = True",
-            "tree = scene.node_tree",
-            "",
-            "# Find or create Render Layers node",
-            "rl_node = None",
-            "for node in tree.nodes:",
-            "    if node.type == 'R_LAYERS':",
-            "        rl_node = node",
-            "        break",
-            "if not rl_node:",
-            "    rl_node = tree.nodes.new('CompositorNodeRLayers')",
-            "",
-            "# Create File Output node for individual passes",
-            "file_out = tree.nodes.new('CompositorNodeOutputFile')",
-            "file_out.name = 'PassExport'",
-            "file_out.label = 'Pass Export'",
-            f"file_out.base_path = pass_dir",
-            "file_out.format.file_format = 'OPEN_EXR'",
-            "file_out.format.color_depth = '32'",
-            "file_out.format.exr_codec = 'DWAA'",
-            "",
-            "# Remove default input slot via its socket",
-            "if file_out.inputs:",
-            "    file_out.inputs.remove(file_out.inputs[0])",
-            "",
-            "# Connect available passes to file output",
-            "pass_map = {",
-            "    'Image': 'combined',",
-            "    'Normal': 'normal',",
-            "    'Denoising Normal': 'denoising_normal',",
-            "    'Denoising Albedo': 'denoising_albedo',",
-            "    'Depth': 'depth',",
-            "    'DiffCol': 'diffuse_color',",
-            "    'GlossCol': 'glossy_color',",
-            "}",
-            "",
-            "connected_passes = []",
-            "for pass_name, file_prefix in pass_map.items():",
-            "    if pass_name in rl_node.outputs and rl_node.outputs[pass_name].enabled:",
-            "        file_out.file_slots.new(file_prefix)",
-            "        tree.links.new(rl_node.outputs[pass_name], file_out.inputs[-1])",
-            "        connected_passes.append(pass_name)",
-            "",
-            "print(f'File Output passes connected: {connected_passes}')",
-            ""
-        ])
-
-        # Enable denoising data pass if cycles
-        if engine == 'CYCLES':
-            script_lines.extend([
-                "# Ensure denoising passes are enabled for proper pass export",
-                "vl = scene.view_layers[0]",
-                "vl.use_pass_normal = True",
-                "if hasattr(vl.cycles, 'denoising_store_passes'):",
-                "    vl.cycles.denoising_store_passes = True",
-                "elif hasattr(vl, 'use_pass_cryptomatte_object'):",
-                "    pass  # Newer API",
-                "print(f'View layer passes: Normal={vl.use_pass_normal}')",
-                ""
-            ])
-
         # Render with absolute control
         script_lines.extend([
             "# Render with absolute output path control",
@@ -526,14 +456,6 @@ class RenderJobManager:
             "                print(f'  {f.name} ({f.stat().st_size} bytes)')",
             "    exit(1)",
             "",
-            "# List pass files that were saved",
-            f"pass_dir_path = Path(r'{pass_dir}')",
-            "if pass_dir_path.exists():",
-            "    print('Pass files saved:')",
-            "    for f in sorted(pass_dir_path.iterdir()):",
-            "        if f.is_file():",
-            "            print(f'  {f.name} ({f.stat().st_size} bytes)')",
-            "",
             "# Save PNG preview from Render Result (same Blender process, guaranteed to work)",
             f"png_path = r'{output_path.with_suffix('.png')}'",
             "try:",
@@ -544,10 +466,6 @@ class RenderJobManager:
             "    print(f'SUCCESS: PNG preview saved to {png_path}')",
             "except Exception as e:",
             "    print(f'WARNING: Failed to save PNG preview: {e}')",
-            "",
-            "# Remove the File Output node (cleanup)",
-            "if 'PassExport' in tree.nodes:",
-            "    tree.nodes.remove(tree.nodes['PassExport'])",
             "",
             "print('=== RENDER SCRIPT COMPLETE ===')",
             ""
@@ -849,21 +767,17 @@ def get_render_pass(job_id, pass_name):
     if job_status['status'] != 'complete':
         return jsonify({'error': 'Job not completed'}), 400
 
-    # Pass files are in passes/ subdirectory with frame number suffix
+    # Pass files are in passes/ subdirectory, named directly: combined.exr, normal.exr, etc.
     output_path = Path(job_status.get('final_output_path', ''))
     pass_dir = output_path.parent / "passes"
 
     if not pass_dir.exists():
         return jsonify({'error': 'Pass directory not found'}), 404
 
-    # Find the pass file (File Output adds frame number, e.g. combined0001.exr)
-    pass_file = None
-    for f in pass_dir.iterdir():
-        if f.is_file() and f.name.startswith(pass_name) and f.suffix == '.exr':
-            pass_file = f
-            break
+    # Direct filename match
+    pass_file = pass_dir / f"{pass_name}.exr"
 
-    if not pass_file:
+    if not pass_file.exists():
         return jsonify({'error': f'Pass file not found: {pass_name}'}), 404
 
     bucket_id = job_status.get('bucket_id', 0)

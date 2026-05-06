@@ -141,10 +141,10 @@ zip -r distibuted_bucket_render.zip distibuted_bucket_render/ \
 | DELETE | `/cleanup/all` | Remove all temp files |
 
 ## Next steps
-
-- Per-bucket progress feedback (update at 25%, 50%, 75%)
-- Deploy to Azure Container Instances
-- GPU container support (NVIDIA Container Toolkit)
-- Auth/TLS on container API for cloud deployment
-- Full EXR pass assembly (merge all passes from all buckets into one file)
-- Evaluate Kubernetes for better scaling and management in cloud environments
+- Get RAW render pass downloading and compositing to work properly.
+- Per-bucket progress feedback (update at 25%, 50%, 75%).
+- Deploy to Azure Container Instances.
+- GitHub Actions workflow for building and pushing Docker images on commit.
+- Implement authentication and TLS for container API to secure cloud deployment.
+- Full EXR pass assembly (merge all passes from all buckets into one file).
+- Evaluate Kubernetes for better scaling and management in cloud environments.

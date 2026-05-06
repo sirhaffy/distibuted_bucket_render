@@ -45,12 +45,12 @@ COPY requirements.txt .
 # Install Python packages
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Download and install Blender LTS
+# Download and install Blender 4.2 LTS
 WORKDIR /opt
-RUN wget -q https://download.blender.org/release/Blender3.6/blender-3.6.8-linux-x64.tar.xz \
-    && tar -xf blender-3.6.8-linux-x64.tar.xz \
-    && mv blender-3.6.8-linux-x64 blender \
-    && rm blender-3.6.8-linux-x64.tar.xz \
+RUN wget -q https://download.blender.org/release/Blender4.2/blender-4.2.0-linux-x64.tar.xz \
+    && tar -xf blender-4.2.0-linux-x64.tar.xz \
+    && mv blender-4.2.0-linux-x64 blender \
+    && rm blender-4.2.0-linux-x64.tar.xz \
     && ln -s /opt/blender/blender /usr/local/bin/blender
 
 # Set environment for headless operation
