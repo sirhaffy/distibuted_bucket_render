@@ -124,9 +124,7 @@ zip -r distibuted_bucket_render.zip distibuted_bucket_render/ \
   -x "*.blend1" "*.zip" \
   "distibuted_bucket_render/bucket_resources/*" \
   "distibuted_bucket_render/BlenderTestScene/*" \
-  "*/__pycache__/*" \
-  "distibuted_bucket_render/.git/*" \
-  "distibuted_bucket_render/.idea/*"
+  "*/__pycache__/*" 
 ```
 
 ## Container API
