@@ -1,6 +1,6 @@
 """
 Preview Engine - Handles quick preview assembly
-Responsible for creating fast preview composites for user feedback
+Stitches bucket images directly into a Blender image via pixel data
 """
 
 import bpy
@@ -11,19 +11,18 @@ from typing import Dict
 
 class PreviewEngine:
     """
-    Handles creation of quick preview assemblies using Blender native functions
+    Handles creation of quick preview assemblies by reading bucket PNGs
+    and compositing them into a single Blender image via pixel manipulation.
     """
 
     def __init__(self, context):
         self.context = context
         self.scene = context.scene
-        self.temp_scene = None
-        self.loaded_images = []
 
     def create_preview(self, bucket_files: Dict[int, Path],
                       buckets_x: int, buckets_y: int) -> bool:
         """
-        Create a quick preview assembly
+        Create a quick preview by stitching bucket images together.
 
         Args:
             bucket_files: Dictionary of bucket_id -> file_path
@@ -33,7 +32,6 @@ class PreviewEngine:
             True if successful
         """
         try:
-            # Get render resolution
             width = self.scene.distributed_render_res_x
             height = self.scene.distributed_render_res_y
             percentage = self.scene.distributed_render_percentage
@@ -41,229 +39,75 @@ class PreviewEngine:
             final_width = int(width * percentage / 100)
             final_height = int(height * percentage / 100)
 
-            print(f"Creating preview assembly using Blender native: {final_width}x{final_height}")
+            print(f"Creating preview assembly: {final_width}x{final_height}")
 
-            # Create temporary scene for preview
-            if not self._create_temp_scene():
-                return False
+            # Create or reuse preview image
+            preview_name = "DistributedRender_Preview"
+            if preview_name in bpy.data.images:
+                preview_img = bpy.data.images[preview_name]
+                if preview_img.size[0] != final_width or preview_img.size[1] != final_height:
+                    bpy.data.images.remove(preview_img)
+                    preview_img = bpy.data.images.new(preview_name, final_width, final_height, alpha=True)
+            else:
+                preview_img = bpy.data.images.new(preview_name, final_width, final_height, alpha=True)
 
-            # Load and position bucket images
-            if not self._setup_preview_compositor(bucket_files, buckets_x, buckets_y, final_width, final_height):
-                self._cleanup()
-                return False
+            # Initialize all pixels to black/transparent
+            pixel_count = final_width * final_height * 4
+            pixels = [0.0] * pixel_count
 
-            # Render the preview
-            preview_img = self._render_preview(final_width, final_height)
-            if not preview_img:
-                self._cleanup()
-                return False
+            bucket_width = final_width // buckets_x
+            bucket_height = final_height // buckets_y
 
-            # Show the preview in UI
-            success = self._show_preview_in_ui(preview_img)
-
-            # Cleanup
-            self._cleanup()
-
-            return success
-
-        except Exception as e:
-            print(f"Preview engine error: {e}")
-            import traceback
-            traceback.print_exc()
-            self._cleanup()
-            return False
-
-    def _create_temp_scene(self) -> bool:
-        """Create temporary scene for preview"""
-        try:
-            temp_scene_name = "DistributedRender_Preview_Temp"
-
-            # Remove existing temp scene if it exists
-            if temp_scene_name in bpy.data.scenes:
-                bpy.data.scenes.remove(bpy.data.scenes[temp_scene_name])
-
-            # Create new scene for preview assembly
-            self.temp_scene = bpy.data.scenes.new(temp_scene_name)
-            self.temp_scene.use_nodes = True
-            self.temp_scene.node_tree.nodes.clear()
-
-            print("✓ Created temporary scene for preview")
-            return True
-
-        except Exception as e:
-            print(f"Error creating temp scene: {e}")
-            return False
-
-    def _setup_preview_compositor(self, bucket_files: Dict[int, Path],
-                                 buckets_x: int, buckets_y: int,
-                                 final_width: int, final_height: int) -> bool:
-        """Setup compositor nodes for preview"""
-        try:
-            nodes = self.temp_scene.node_tree.nodes
-            links = self.temp_scene.node_tree.links
-
-            print(f"Processing {len(bucket_files)} bucket files for preview...")
-
-            # Load bucket images as Blender images
-            self.loaded_images = []
-            image_nodes = []
-
+            # Load each bucket and place its pixels in the correct position
             for bucket_id, bucket_file in bucket_files.items():
                 try:
-                    # Calculate bucket position in grid
                     bucket_x = bucket_id % buckets_x
                     bucket_y = bucket_id // buckets_x
 
-                    # Load image into Blender
-                    img_name = f"preview_bucket_{bucket_id}"
-
-                    # Remove existing if present
+                    # Load bucket image
+                    img_name = f"_temp_bucket_{bucket_id}"
                     if img_name in bpy.data.images:
                         bpy.data.images.remove(bpy.data.images[img_name])
 
-                    # Load the bucket image
                     bucket_img = bpy.data.images.load(str(bucket_file))
                     bucket_img.name = img_name
-                    self.loaded_images.append(bucket_img)
 
-                    # Create image node in compositor
-                    img_node = nodes.new(type='CompositorNodeImage')
-                    img_node.image = bucket_img
-                    img_node.label = f"Bucket {bucket_id}"
-                    img_node.location = (bucket_id * 300, bucket_id * -150)
+                    b_width = bucket_img.size[0]
+                    b_height = bucket_img.size[1]
+                    bucket_pixels = list(bucket_img.pixels[:])
 
-                    # Create translate node to position the bucket
-                    translate_node = nodes.new(type='CompositorNodeTranslate')
-                    translate_node.location = (bucket_id * 300 + 200, bucket_id * -150)
+                    # Calculate placement offset
+                    # Blender images are bottom-left origin
+                    offset_x = bucket_x * bucket_width
+                    offset_y = (buckets_y - 1 - bucket_y) * bucket_height
 
-                    # Calculate translation - position buckets in correct grid locations
-                    # Convert grid position to normalized coordinates (-1 to 1)
-                    norm_x = (bucket_x / (buckets_x - 1)) * 2 - 1 if buckets_x > 1 else 0
-                    norm_y = -(bucket_y / (buckets_y - 1)) * 2 + 1 if buckets_y > 1 else 0
+                    # Copy pixels row by row
+                    for row in range(min(b_height, bucket_height)):
+                        dst_y = offset_y + row
+                        if dst_y >= final_height:
+                            break
 
-                    # Scale to bucket size
-                    translate_x = norm_x * (final_width / buckets_x / 2)
-                    translate_y = norm_y * (final_height / buckets_y / 2)
+                        src_start = row * b_width * 4
+                        src_end = src_start + min(b_width, bucket_width) * 4
 
-                    translate_node.inputs['X'].default_value = translate_x
-                    translate_node.inputs['Y'].default_value = translate_y
+                        dst_start = (dst_y * final_width + offset_x) * 4
+                        copy_width = min(b_width, bucket_width) * 4
 
-                    # Create scale node to resize buckets
-                    scale_node = nodes.new(type='CompositorNodeScale')
-                    scale_node.location = (bucket_id * 300 + 400, bucket_id * -150)
-                    scale_node.space = 'RELATIVE'
+                        pixels[dst_start:dst_start + copy_width] = bucket_pixels[src_start:src_start + copy_width]
 
-                    # Scale buckets to fit grid
-                    scale_factor = 1.0 / max(buckets_x, buckets_y)
-                    scale_node.inputs['X'].default_value = scale_factor
-                    scale_node.inputs['Y'].default_value = scale_factor
-
-                    # Connect nodes
-                    links.new(img_node.outputs['Image'], scale_node.inputs['Image'])
-                    links.new(scale_node.outputs['Image'], translate_node.inputs['Image'])
-
-                    image_nodes.append(translate_node)
-
-                    print(f"✓ Added bucket {bucket_id} at grid position ({bucket_x}, {bucket_y})")
+                    # Clean up temp image
+                    bpy.data.images.remove(bucket_img)
+                    print(f"  Placed bucket {bucket_id} at grid ({bucket_x}, {bucket_y})")
 
                 except Exception as e:
-                    print(f"✗ Error processing bucket {bucket_id}: {e}")
+                    print(f"  Error placing bucket {bucket_id}: {e}")
                     continue
 
-            if not image_nodes:
-                print("✗ No bucket images could be loaded")
-                return False
+            # Write pixels to preview image
+            preview_img.pixels = pixels
+            preview_img.update()
 
-            # Combine all buckets using Alpha Over nodes
-            print(f"Combining {len(image_nodes)} bucket images...")
-
-            if len(image_nodes) == 1:
-                final_node = image_nodes[0]
-            else:
-                # Start with first image
-                final_node = image_nodes[0]
-
-                # Add each subsequent image
-                for i in range(1, len(image_nodes)):
-                    alpha_over = nodes.new(type='CompositorNodeAlphaOver')
-                    alpha_over.location = (1000 + i * 200, 0)
-
-                    # Connect: background (accumulated) and foreground (new bucket)
-                    links.new(final_node.outputs['Image'], alpha_over.inputs[1])  # Background
-                    links.new(image_nodes[i].outputs['Image'], alpha_over.inputs[2])  # Foreground
-
-                    final_node = alpha_over
-
-            # Create output node
-            output_node = nodes.new(type='CompositorNodeComposite')
-            output_node.location = (1500, 0)
-            links.new(final_node.outputs['Image'], output_node.inputs['Image'])
-
-            print("✓ Preview compositor setup complete")
-            return True
-
-        except Exception as e:
-            print(f"Error setting up preview compositor: {e}")
-            return False
-
-    def _render_preview(self, final_width: int, final_height: int):
-        """Render the preview and return the result image"""
-        try:
-            # Set render settings for the temp scene
-            self.temp_scene.render.resolution_x = final_width
-            self.temp_scene.render.resolution_y = final_height
-            self.temp_scene.render.resolution_percentage = 100
-            self.temp_scene.render.image_settings.file_format = 'PNG'
-            self.temp_scene.render.image_settings.color_mode = 'RGBA'
-
-            # Switch to temp scene and render
-            original_scene = self.context.scene
-            self.context.window.scene = self.temp_scene
-
-            print(f"Rendering preview assembly...")
-            bpy.ops.render.render()
-
-            # Get the render result
-            render_result = bpy.data.images.get('Render Result')
-            if render_result:
-                # Create a copy of the render result
-                preview_name = f"DistributedRender_Preview_{int(time.time())}"
-
-                # Remove existing preview
-                if preview_name in bpy.data.images:
-                    bpy.data.images.remove(bpy.data.images[preview_name])
-
-                # Create new image and copy pixels
-                preview_img = bpy.data.images.new(preview_name, final_width, final_height, alpha=True)
-
-                # Copy pixel data from render result
-                if len(render_result.pixels) > 0:
-                    preview_img.pixels = render_result.pixels[:]
-                    preview_img.update()
-
-                # Switch back to original scene
-                self.context.window.scene = original_scene
-
-                print(f"✓ Preview render completed: {preview_name}")
-                return preview_img
-            else:
-                print("✗ No render result found")
-                self.context.window.scene = original_scene
-                return None
-
-        except Exception as e:
-            print(f"Error rendering preview: {e}")
-            # Switch back to original scene on error
-            try:
-                self.context.window.scene = original_scene
-            except:
-                pass
-            return None
-
-    def _show_preview_in_ui(self, preview_img) -> bool:
-        """Show the preview in Blender's UI"""
-        try:
-            # Set the preview as the active image in Image Editor
+            # Show in Image Editor if one is open
             for area in self.context.screen.areas:
                 if area.type == 'IMAGE_EDITOR':
                     for space in area.spaces:
@@ -272,25 +116,13 @@ class PreviewEngine:
                             break
                     break
 
-            # Try to switch to Rendering workspace
-            try:
-                self.context.window.workspace = bpy.data.workspaces['Rendering']
-                print("✓ Switched to Rendering workspace")
-            except:
-                try:
-                    self.context.window.workspace = bpy.data.workspaces['Shading']
-                    print("✓ Switched to Shading workspace")
-                except:
-                    print("! Could not switch workspace")
-
-            print(f"✓ Preview assembly completed using pure Blender!")
-            print(f"✓ Preview shows {len(self.loaded_images)} buckets assembled")
-            print(f"✓ Result available as '{preview_img.name}' in Image Editor")
-
+            print(f"Preview complete: {len(bucket_files)} buckets assembled")
             return True
 
         except Exception as e:
-            print(f"Error showing preview in UI: {e}")
+            print(f"Preview engine error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _cleanup(self):

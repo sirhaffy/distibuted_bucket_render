@@ -82,8 +82,9 @@ class BucketSplitter:
         Returns:
             List of RenderBucket objects
         """
-        buckets_x = self.scene.distributed_render_buckets_x
-        buckets_y = self.scene.distributed_render_buckets_y
+        n = self.scene.distributed_render_bucket_count
+        buckets_x = n
+        buckets_y = n
 
         self.logger.info(f"Creating {buckets_x}x{buckets_y} bucket grid ({buckets_x * buckets_y} total buckets)")
 

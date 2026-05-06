@@ -7,10 +7,10 @@ bl_info = {
     "name": "Distributed Render",
     "author": "Your Name",
     "version": (1, 0, 0),
-    "blender": (3, 0, 0),
+    "blender": (4, 2, 0),
     "description": "Distribute rendering across Docker containers",
     "category": "Render",
-    "location": "3D Viewport > N-panel > Render",
+    "location": "Render Properties > Distributed Render",
     "doc_url": "",
     "tracker_url": "",
 }
@@ -22,6 +22,17 @@ from bpy.props import IntProperty, BoolProperty, StringProperty, EnumProperty, F
 from . import addon_preferences
 from . import panels
 from . import operators
+
+# Utility function to get camera items for the EnumProperty
+def get_camera_items(self, context):
+    """Dynamic enum callback to list all cameras in the scene"""
+    items = []
+    for obj in context.scene.objects:
+        if obj.type == 'CAMERA':
+            items.append((obj.name, obj.name, f"Use camera: {obj.name}"))
+    if not items:
+        items.append(('NONE', 'No cameras', 'No cameras found in scene'))
+    return items
 
 def register():
     print("Registering Distributed Render Addon...")
@@ -63,79 +74,36 @@ def register_scene_properties():
         default=False
     )
 
-    # Custom render settings (separate from Blender's)
-    bpy.types.Scene.distributed_render_res_x = IntProperty(
-        name="Resolution X",
-        description="Render resolution X (separate from Blender's settings)",
-        default=1920,
-        min=64,
-        max=8192
-    )
-
-    bpy.types.Scene.distributed_render_res_y = IntProperty(
-        name="Resolution Y",
-        description="Render resolution Y (separate from Blender's settings)",
-        default=1080,
-        min=64,
-        max=8192
-    )
-
-    bpy.types.Scene.distributed_render_percentage = IntProperty(
-        name="Resolution Scale",
-        description="Resolution percentage",
-        default=100,
+    # Bucket settings - total number of buckets, grid auto-calculated for square tiles
+    bpy.types.Scene.distributed_render_bucket_count = IntProperty(
+        name="Buckets",
+        description="Total number of buckets (grid auto-calculated for square tiles based on aspect ratio)",
+        default=16,
         min=1,
-        max=1000
+        max=1024
     )
 
-    bpy.types.Scene.distributed_render_engine = EnumProperty(
-        name="Render Engine",
-        description="Rendering engine to use",
-        items=[
-            ('CYCLES', 'Cycles', 'Cycles rendering engine'),
-            ('BLENDER_EEVEE', 'Eevee', 'Eevee rendering engine'),
-        ],
-        default='CYCLES'
+    # Render start point (normalized 0-1)
+    bpy.types.Scene.distributed_render_start_x = FloatProperty(
+        name="Start X",
+        description="X position to start rendering from (0=left, 1=right)",
+        default=0.5,
+        min=0.0,
+        max=1.0
     )
 
-    bpy.types.Scene.distributed_render_device = EnumProperty(
-        name="Device",
-        description="Rendering device",
-        items=[
-            ('CPU', 'CPU', 'Use CPU for rendering'),
-            ('GPU', 'GPU', 'Use GPU for rendering (if available)'),
-        ],
-        default='CPU'
+    bpy.types.Scene.distributed_render_start_y = FloatProperty(
+        name="Start Y",
+        description="Y position to start rendering from (0=bottom, 1=top)",
+        default=0.5,
+        min=0.0,
+        max=1.0
     )
 
-    bpy.types.Scene.distributed_render_samples = IntProperty(
-        name="Samples",
-        description="Number of samples for Cycles rendering",
-        default=128,
-        min=1,
-        max=10000
-    )
-
-    # Bucket settings
-    bpy.types.Scene.distributed_render_buckets_x = IntProperty(
-        name="Buckets X",
-        description="Number of horizontal buckets",
-        default=2,
-        min=1,
-        max=16
-    )
-
-    bpy.types.Scene.distributed_render_buckets_y = IntProperty(
-        name="Buckets Y",
-        description="Number of vertical buckets",
-        default=2,
-        min=1,
-        max=16
-    )
-
+    # Container settings
     bpy.types.Scene.distributed_render_containers = IntProperty(
         name="Container Count",
-        description="Number of Docker containers to use",
+        description="Number of render containers to scan (ports 8080 to 8080+N)",
         default=4,
         min=1,
         max=32
@@ -162,23 +130,35 @@ def register_scene_properties():
         max=100.0
     )
 
+    # Camera selector
+    bpy.types.Scene.distributed_render_camera = EnumProperty(
+        name="Render Camera",
+        description="Camera to use for distributed rendering",
+        items=get_camera_items
+    )
+
+    # Abort flag
+    bpy.types.Scene.distributed_render_abort = BoolProperty(
+        name="Abort Render",
+        default=False
+    )
+
 def unregister_scene_properties():
     """Remove all scene properties"""
 
     props_to_remove = [
         'distributed_render_enabled',
-        'distributed_render_res_x',
-        'distributed_render_res_y',
-        'distributed_render_percentage',
-        'distributed_render_engine',
-        'distributed_render_device',
-        'distributed_render_samples',
+        'distributed_render_bucket_count',
         'distributed_render_buckets_x',
         'distributed_render_buckets_y',
+        'distributed_render_start_x',
+        'distributed_render_start_y',
         'distributed_render_containers',
+        'distributed_render_camera',
         'distributed_render_status',
         'distributed_render_docker_status',
         'distributed_render_progress',
+        'distributed_render_abort',
     ]
 
     for prop in props_to_remove:

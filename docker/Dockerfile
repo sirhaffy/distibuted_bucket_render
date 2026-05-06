@@ -1,15 +1,17 @@
-# Complete headless Blender Dockerfile - ALL required libraries for headless rendering
-FROM python:3.10-slim
+# GPU-enabled headless Blender Dockerfile with CUDA support
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 
-# Install COMPLETE set of system dependencies for headless Blender
+# Install Python and system dependencies for headless Blender
 RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
     curl \
     wget \
     xz-utils \
     libx11-6 \
     libxi6 \
     libxrender1 \
-    libgl1-mesa-glx \
+    libgl1 \
     libglu1-mesa \
     libxkbcommon0 \
     libxcursor1 \
@@ -25,9 +27,8 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1 \
     libfreetype6 \
     libasound2 \
-    libgconf-2-4 \
     libgtk-3-0 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-2.0-0 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libatk1.0-0 \
@@ -42,7 +43,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python packages
-RUN pip install --break-system-packages --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Download and install Blender LTS
 WORKDIR /opt
@@ -74,4 +75,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Run server
-CMD ["python", "render_node.py"]
+CMD ["python3", "render_node.py"]

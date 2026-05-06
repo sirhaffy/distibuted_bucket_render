@@ -228,8 +228,9 @@ class ImageCompositor:
     def _draw_bucket_borders(self, draw: ImageDraw.Draw):
         """Draw bucket borders on overlay"""
         try:
-            buckets_x = self.scene.distributed_render_buckets_x
-            buckets_y = self.scene.distributed_render_buckets_y
+            n = self.scene.distributed_render_bucket_count
+            buckets_x = n
+            buckets_y = n
 
             # Draw vertical lines
             for x in range(1, buckets_x):
@@ -255,7 +256,7 @@ class ImageCompositor:
             # Prepare text
             stats_text = [
                 f"Progress: {completion_percentage:.1f}%",
-                f"Buckets: {len(self.assembled_buckets)}/{self.scene.distributed_render_buckets_x * self.scene.distributed_render_buckets_y}",
+                f"Buckets: {len(self.assembled_buckets)}/{self.scene.distributed_render_bucket_count ** 2}",
                 f"Resolution: {self.final_width}x{self.final_height}"
             ]
 

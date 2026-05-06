@@ -68,18 +68,6 @@ class DistributedRenderPreferences(AddonPreferences):
     )
 
     # Rendering settings
-    default_bucket_size: EnumProperty(
-        name="Default Bucket Size",
-        description="Default size for render buckets",
-        items=[
-            ('128', '128x128', 'Small buckets for high detail'),
-            ('256', '256x256', 'Medium buckets (recommended)'),
-            ('512', '512x512', 'Large buckets for simple scenes'),
-            ('1024', '1024x1024', 'Very large buckets'),
-        ],
-        default='256'
-    )
-
     progressive_update_interval: IntProperty(
         name="Update Interval",
         description="Seconds between progressive render updates",
@@ -142,7 +130,6 @@ class DistributedRenderPreferences(AddonPreferences):
         # Rendering Settings
         box = layout.box()
         box.label(text="Rendering Settings", icon='RENDER_STILL')
-        box.prop(self, "default_bucket_size")
         box.prop(self, "progressive_update_interval")
         box.prop(self, "auto_pack_resources")
         box.prop(self, "auto_optimize_buckets")
