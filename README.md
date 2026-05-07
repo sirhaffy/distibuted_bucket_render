@@ -6,23 +6,24 @@
 ![Azure](https://img.shields.io/badge/Azure-Container%20Instances-0078D4?logo=microsoftazure&logoColor=white)
 ![Status](https://img.shields.io/badge/Status-WIP-yellow)
 
-Blender addon that splits a frame into buckets, sends them to Docker containers for rendering, and composites the results progressively as EXR MultiLayer tiles. Think Cinema 4D Team Render, but for Blender and cloud infrastructure.
+Blender addon that splits a frame into buckets, sends them to Docker containers for rendering, and composites the results result to EXR. Think Cinema 4D Team Render, but for Blender and cloud infrastructure.
 
-> **Status:** Work in progress. Bucket splitting, Docker containers, EXR output, and live preview all work locally. Azure deployment not yet done.
+> **Status:** Work in progress. Bucket splitting, Docker containers, Single render image output, and live preview all work locally.
 
 ## Why
 
-Blender only renders on the machine it's running on. I wanted to offload heavy renders to the cloud while still getting visual feedback as buckets complete - not just wait for the entire frame. The end goal is rendering at 16K on Azure while keeping the creative loop tight.
+Blender only renders on one machine per image. I wanted to offload heavy renders to multiple computers, like to the cloud while still getting visual feedback as buckets complete, not just wait for the entire frame to finish. The end goal is rendering at 16K on Azure while keeping the creative loop tight.
 
 ## Features
 
-- **Square bucket grid** - configurable NxN grid (1-16), center-out render order
-- **Camera selector** - pick any camera in the scene from a dropdown
-- **Render region support** - respects Blender's render border, only renders visible area
-- **EXR MultiLayer output** - all render passes preserved (Combined, Depth, Normal, etc.), DWAA compression, 32-bit float
-- **Live preview** - opens Image Editor and shows buckets appearing as they complete
-- **Save Final** - exports assembled render to disk as timestamped EXR
-- **Stateless containers** - nothing persists after a job, works anywhere (Docker, ACI, K8s)
+- **Square bucket grid** - configurable NxN grid (1-1024).
+- **Render position** - default is set to render from center and out, but can be changed by X and Y pos.
+- **Camera selector** - pick any camera in the scene from a dropdown.
+- **Render region support** - respects Blender's render border, only renders visible area.
+- **EXR MultiLayer output** - all render passes preserved (Combined, Depth, Normal, etc.), DWAA compression, 32-bit float.
+- **Live preview** - opens Image Editor and shows buckets appearing as they complete.
+- **Save Final** - exports assembled render to disk as PNG or EXR. Also save EXR to composer, for further tweeks.
+- **Stateless containers** - nothing persists after a job, works anywhere (Docker, ACI, K8s).
 
 ## How it works
 
@@ -40,7 +41,7 @@ Blender Addon
 └── Calls DELETE /cleanup/all when done
 ```
 
-Containers are fully stateless - nothing persists after a job completes. Works the same whether the container runs locally via Docker Compose, in Azure Container Instances, or in Kubernetes.
+Containers are fully stateless, nothing persists after a job completes. Works the same whether the container runs locally via Docker Compose, in Azure Container Instances or in Kubernetes (still needs to be tested, only works locally for now).
 
 ## Structure
 
@@ -78,30 +79,30 @@ utils/
 
 ## Stack
 
-- **Host:** Python 3.10, Blender 4.2 API, NumPy
-- **Containers:** Blender 3.6.8 headless, Flask, Python 3.10
-- **Infra:** Docker Compose (local), Azure Container Instances (planned)
-- **Output:** OpenEXR MultiLayer (DWAA, 32-bit float)
+- **Host:** Python 3.10, Blender 4.2 API, NumPy.
+- **Containers:** Blender 4.2 headless, Flask, Python 3.10.
+- **Infra:** Docker Compose (local), Azure Container Instances (planned).
+- **Output:** OpenEXR MultiLayer (DWAA, 32-bit float).
 
 ## What works
 
-- Square bucket grid with configurable size (NxN)
-- Center-out render order (starts from middle, spirals outward)
-- Camera selection from scene
-- Render region support (only renders visible area)
-- EXR MultiLayer output with all passes from containers
-- Docker containers build and run (4 nodes on ports 8080-8083)
-- Stateless HTTP communication (upload, render, download, cleanup)
-- Live preview in Image Editor as buckets complete
-- Save Final button exports assembled render as timestamped EXR
+- Square bucket grid with configurable size (NxN).
+- Center-out render order (starts from middle, spirals outward).
+- Camera selection from scene.
+- Render region support (only renders visible area).
+- PNG and EXR output from containers to disk.
+- Docker containers build and run (4 nodes on ports 8080-8083).
+- Stateless HTTP communication (upload, render, download, cleanup).
+- Live preview in Image Editor as buckets complete.
+- Save Final button exports assembled render as EXR.
 
 ## What doesn't work yet
 
-- GPU rendering in Docker (no NVIDIA Container Toolkit, containers use CPU)
-- No Azure deployment
-- No per-bucket progress feedback (only completion notification)
-- No auth on container API (fine for local, needs fixing for cloud)
-- Assembly of individual EXR passes (only Combined pass composited in live preview)
+- Export EXR passes to composer or save to disk.
+- No Azure deployment.
+- No per-bucket progress feedback (only completion notification).
+- No auth on container API (fine for local, needs fixing for cloud).
+- Assembly of individual EXR passes (only Combined pass composited in live preview).
 
 ## Running locally
 
